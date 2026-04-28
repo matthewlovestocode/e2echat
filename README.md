@@ -7,6 +7,11 @@ Monorepo for a browser-based end-to-end encrypted chat demo.
 - `apps/web`: Next.js + Material UI client.
 - `apps/ws-server`: WebSocket relay that forwards room messages without decrypting them.
 
+## Documentation
+
+Start with [`docs/index.md`](docs/index.md) for a newcomer-friendly explanation of the codebase,
+architecture, encryption flow, WebSocket relay, and local development workflow.
+
 ## Development
 
 ```bash
