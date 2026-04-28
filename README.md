@@ -9,7 +9,9 @@ Monorepo for a browser-based end-to-end encrypted chat demo.
 
 ## Documentation
 
-Start with [`docs/index.md`](docs/index.md) for a newcomer-friendly explanation of the codebase,
+If you just want to run the app, start with [`docs/how-to-run.md`](docs/how-to-run.md).
+
+For a broader newcomer-friendly explanation, start with [`docs/index.md`](docs/index.md) for the codebase,
 architecture, encryption flow, WebSocket relay, and local development workflow.
 
 ## Development

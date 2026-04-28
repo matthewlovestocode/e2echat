@@ -4,11 +4,12 @@ This directory explains how the project works for someone who is new to the code
 
 ## Reading Order
 
-1. [Architecture](./architecture.md): The shape of the monorepo and how the apps fit together.
-2. [Encryption Flow](./encryption-flow.md): How browser key exchange, encryption, and decryption work.
-3. [Web App](./web-app.md): How the Next.js and Material UI client is organized.
-4. [WebSocket Relay](./websocket-relay.md): How room membership and message forwarding work.
-5. [Development Guide](./development.md): How to install, run, validate, and extend the project.
+1. [How to Run the App](./how-to-run.md): Step-by-step instructions for cloning, installing, starting, and testing the app locally.
+2. [Architecture](./architecture.md): The shape of the monorepo and how the apps fit together.
+3. [Encryption Flow](./encryption-flow.md): How browser key exchange, encryption, and decryption work.
+4. [Web App](./web-app.md): How the Next.js and Material UI client is organized.
+5. [WebSocket Relay](./websocket-relay.md): How room membership and message forwarding work.
+6. [Development Guide](./development.md): How to validate and extend the project.
 
 ## What This Project Demonstrates
 
