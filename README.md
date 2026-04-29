@@ -1,18 +1,18 @@
 # E2E Chat
 
-Monorepo for a browser-based end-to-end encrypted chat demo.
+Monorepo for a browser-based end-to-end encrypted chat demo that can run as a single
+Next.js app on Vercel.
 
 ## Apps
 
-- `apps/web`: Next.js + Material UI client.
-- `apps/ws-server`: WebSocket relay that forwards room messages without decrypting them.
+- `apps/web`: Next.js + Material UI client, SSE receive endpoint, and HTTP send endpoint.
 
 ## Documentation
 
 If you just want to run the app, start with [`docs/how-to-run.md`](docs/how-to-run.md).
 
 For a broader newcomer-friendly explanation, start with [`docs/index.md`](docs/index.md) for the codebase,
-architecture, encryption flow, WebSocket relay, and local development workflow.
+architecture, encryption flow, SSE relay, Vercel deployment, and local development workflow.
 
 ## Development
 
@@ -21,4 +21,4 @@ npm install
 npm run dev
 ```
 
-The web app runs on `http://localhost:3000` and expects the WebSocket relay at `ws://localhost:3001`.
+The web app runs on `http://localhost:3000`. No separate WebSocket server is required.

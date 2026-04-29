@@ -14,11 +14,11 @@ From the repository root:
 npm install
 ```
 
-This installs dependencies for the root workspace and both apps.
+This installs dependencies for the root workspace and the Next.js app.
 
 ## Run Locally
 
-Start the web app and relay together:
+Start the Next.js app:
 
 ```bash
 npm run dev
@@ -29,18 +29,10 @@ Default local endpoints:
 | Service | URL |
 | --- | --- |
 | Web app | `http://localhost:3000` |
-| WebSocket relay | `ws://localhost:3001` |
+| SSE events route | `http://localhost:3000/api/rooms/:roomId/events` |
+| Message POST route | `http://localhost:3000/api/rooms/:roomId/messages` |
 
 To test the chat flow, open `http://localhost:3000` in two browser windows or tabs. Keep the same room name in both windows. Once both clients exchange public keys, the status chip changes from waiting to encrypted.
-
-## Run One App at a Time
-
-```bash
-npm run dev:web
-npm run dev:ws
-```
-
-These scripts are useful when you want separate terminal output for each app.
 
 ## Validate Changes
 
@@ -57,8 +49,8 @@ What each command checks:
 | Command | What It Catches |
 | --- | --- |
 | `npm run lint` | Next.js and React lint issues in the web app. |
-| `npm run typecheck` | TypeScript errors in both workspaces. |
-| `npm run build` | Production build failures for the web app and relay. |
+| `npm run typecheck` | TypeScript errors in the Next.js workspace. |
+| `npm run build` | Production build failures for the Next.js app. |
 
 ## Common Code Changes
 
@@ -72,21 +64,7 @@ Edit [apps/web/app/theme.ts](../apps/web/app/theme.ts) to adjust colors, typogra
 
 ### Change Relay Behavior
 
-Edit [apps/ws-server/src/index.ts](../apps/ws-server/src/index.ts). Keep in mind that the relay should not receive plaintext or private keys. If a new message type is added, update both the server-side `IncomingMessage` type and the browser-side `WireMessage` type.
-
-### Change the WebSocket URL
-
-Set `NEXT_PUBLIC_WS_URL` for the web app:
-
-```bash
-NEXT_PUBLIC_WS_URL=ws://localhost:8080 npm run dev:web
-```
-
-Run the relay on a matching port:
-
-```bash
-PORT=8080 npm run dev:ws
-```
+Edit [apps/web/app/api/rooms/[roomId]](../apps/web/app/api/rooms/%5BroomId%5D). Keep in mind that the relay should not receive plaintext or private keys. If a new message type is added, update the route-handler validation and the browser-side `WireMessage` type.
 
 ## Suggested Next Improvements
 
@@ -98,4 +76,4 @@ The current implementation is intentionally compact. Good next improvements woul
 - Add key verification so users can detect man-in-the-middle attacks.
 - Add authenticated room joins.
 - Add encrypted message persistence.
-- Add a production deployment configuration for the web app and relay.
+- Replace the in-memory relay store with a shared pub/sub backend for production.

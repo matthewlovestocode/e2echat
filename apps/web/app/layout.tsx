@@ -8,7 +8,7 @@ import { theme } from "./theme";
 
 export const metadata: Metadata = {
   title: "E2E Chat",
-  description: "End-to-end encrypted chat demo over WebSockets"
+  description: "End-to-end encrypted chat demo over Server-Sent Events"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

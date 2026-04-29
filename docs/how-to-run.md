@@ -4,23 +4,22 @@ This guide is for someone opening the project for the first time. It explains wh
 
 ## What You Are Running
 
-The application has two local services:
+The application has one local service:
 
 | Service | What It Does | Default URL |
 | --- | --- | --- |
-| Next.js web app | Shows the chat UI and performs encryption in the browser. | `http://localhost:3000` |
-| WebSocket relay | Connects browser clients in the same room and forwards ciphertext. | `ws://localhost:3001` |
+| Next.js web app | Shows the chat UI, performs encryption in the browser, and hosts SSE/POST relay routes. | `http://localhost:3000` |
 
-The usual command, `npm run dev`, starts both services at the same time.
+The usual command, `npm run dev`, starts the Next.js app.
 
 ```mermaid
 flowchart LR
   command["npm run dev"]
   web["Next.js web app\nhttp://localhost:3000"]
-  relay["WebSocket relay\nws://localhost:3001"]
+  api["Route handlers\nSSE receive + HTTP send"]
 
   command --> web
-  command --> relay
+  web --> api
 ```
 
 ## 1. Install Prerequisites
@@ -85,7 +84,7 @@ This installs:
 
 - Root development tooling.
 - Next.js and Material UI dependencies for `apps/web`.
-- WebSocket server dependencies for `apps/ws-server`.
+- Next.js route handlers used for room events and encrypted message sends.
 
 The install may print funding information or audit warnings. Those messages do not prevent the app from running unless npm exits with an error.
 
@@ -97,15 +96,14 @@ Run the development command from the repository root:
 npm run dev
 ```
 
-This starts both workspaces through `concurrently`.
+This starts the web app and its API route handlers.
 
 You should see output like:
 
 ```text
-[web] Next.js ...
-[web] - Local: http://localhost:3000
-[web] Ready
-[ws] WebSocket relay listening on ws://localhost:3001
+Next.js ...
+- Local: http://localhost:3000
+Ready
 ```
 
 Leave this terminal running. The app stays available while this command is active.
@@ -138,7 +136,7 @@ Keep both clients in the same room, such as the default `demo-room`.
 
 Once the two clients see each other:
 
-- Each browser exchanges a public key through the relay.
+- Each browser exchanges a public key through the SSE route.
 - Each browser derives the same shared encryption key locally.
 - The status changes to an encrypted or secure-session state.
 - The message input becomes enabled.
@@ -146,11 +144,11 @@ Once the two clients see each other:
 ```mermaid
 sequenceDiagram
   participant A as First browser tab
-  participant S as WebSocket relay
+  participant S as Next route handlers
   participant B as Second browser tab
 
-  A->>S: Join demo-room with public key
-  B->>S: Join demo-room with public key
+  A->>S: Open SSE stream with public key
+  B->>S: Open SSE stream with public key
   S->>A: Send B public key
   S->>B: Send A public key
   A->>A: Derive shared AES-GCM key
@@ -169,14 +167,14 @@ In the second browser window:
 1. Confirm the message appears in the chat.
 2. Send a reply.
 
-The relay only receives encrypted payloads. The readable text is encrypted before it leaves the sending browser and decrypted after it reaches the receiving browser.
+The route-handler relay only receives encrypted payloads. The readable text is encrypted before it leaves the sending browser and decrypted after it reaches the receiving browser.
 
 ```mermaid
 flowchart LR
   plain["Plaintext in sender browser"]
   encrypt["Encrypt with shared key"]
-  wire["Ciphertext over WebSocket"]
-  relay["Relay forwards ciphertext"]
+  wire["Ciphertext over HTTP POST"]
+  relay["Relay streams ciphertext over SSE"]
   decrypt["Decrypt in receiver browser"]
   readable["Plaintext in receiver browser"]
 
@@ -191,47 +189,7 @@ Go back to the terminal where `npm run dev` is running and press:
 Ctrl+C
 ```
 
-That stops both the web app and WebSocket relay.
-
-## Running Services Separately
-
-Most newcomers should use `npm run dev`. If you want separate terminal windows for each service, run these commands from the repository root.
-
-Terminal 1:
-
-```bash
-npm run dev:ws
-```
-
-Terminal 2:
-
-```bash
-npm run dev:web
-```
-
-The relay should be running before you try to exchange messages between browser clients.
-
-## Changing the WebSocket URL
-
-By default, the web app connects to:
-
-```text
-ws://localhost:3001
-```
-
-If you run the relay on a different port, set both the relay port and the web app URL.
-
-Terminal 1:
-
-```bash
-PORT=8080 npm run dev:ws
-```
-
-Terminal 2:
-
-```bash
-NEXT_PUBLIC_WS_URL=ws://localhost:8080 npm run dev:web
-```
+That stops the local Next.js app.
 
 ## Troubleshooting
 
@@ -265,17 +223,17 @@ Open a second browser window or tab at the same URL and keep both clients in the
 
 Check these conditions:
 
-- The relay terminal shows `WebSocket relay listening on ws://localhost:3001`.
+- The terminal running `npm run dev` still shows the Next.js server as ready.
 - Both browser clients use the same room name.
 - The status says the encrypted session is established.
 - The message input is enabled.
 
-### Browser Console Shows a WebSocket Error
+### Browser Console Shows an EventSource Error
 
-The relay may not be running, or `NEXT_PUBLIC_WS_URL` may point to the wrong URL. Start the relay with:
+The local Next.js server may not be running, or the browser may have a stale connection. Start the app with:
 
 ```bash
-npm run dev:ws
+npm run dev
 ```
 
 Then reload the browser.
@@ -293,9 +251,8 @@ The development server usually updates automatically. If the UI looks stale:
 | Goal | Command |
 | --- | --- |
 | Install dependencies | `npm install` |
-| Run web app and relay | `npm run dev` |
+| Run the app | `npm run dev` |
 | Run only the web app | `npm run dev:web` |
-| Run only the relay | `npm run dev:ws` |
 | Stop running services | `Ctrl+C` |
 | Typecheck the repo | `npm run typecheck` |
 | Build the repo | `npm run build` |

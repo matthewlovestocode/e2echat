@@ -1,6 +1,6 @@
 # Architecture
 
-The repository is an npm workspaces monorepo. The root owns shared scripts and dependency installation, while each app owns its runtime code and package metadata.
+The repository is an npm workspaces monorepo. The root owns shared scripts and dependency installation. The current runtime is a single Next.js app so it can deploy to Vercel without a separate WebSocket process.
 
 ```mermaid
 flowchart TD
@@ -9,40 +9,40 @@ flowchart TD
   lockfile["package-lock.json\nresolved dependency graph"]
   docs["docs/\nproject documentation"]
   web["apps/web\nNext.js + Material UI client"]
-  ws["apps/ws-server\nWebSocket relay"]
+  api["apps/web/app/api\nSSE + HTTP relay routes"]
 
   repo --> rootPkg
   repo --> lockfile
   repo --> docs
   repo --> web
-  repo --> ws
+  web --> api
 ```
 
-## Runtime Apps
+## Runtime App
 
-`apps/web` is the user-facing chat client. It runs in the browser through Next.js and uses Material UI for layout, forms, buttons, alerts, chips, and message surfaces. It is responsible for all encryption and decryption.
+`apps/web` is the user-facing chat client and the relay host. It runs through Next.js, uses Material UI for layout, and exposes route handlers under `app/api`.
 
-`apps/ws-server` is the relay. It accepts WebSocket connections, records which room a socket joined, exchanges public keys between clients in the same room, and broadcasts ciphertext messages. It does not decrypt messages.
+The browser is responsible for all encryption and decryption. The route handlers keep room membership in memory, stream peer events with Server-Sent Events, and accept encrypted messages through HTTP POST.
 
 ## Runtime Communication
 
 ```mermaid
 flowchart LR
   alice["Browser A\napps/web"]
-  relay["WebSocket relay\napps/ws-server"]
+  relay["Next route handlers\nSSE + POST"]
   bob["Browser B\napps/web"]
 
-  alice -- "join room + public key" --> relay
-  bob -- "join room + public key" --> relay
+  alice -- "EventSource: room + public key" --> relay
+  bob -- "EventSource: room + public key" --> relay
   relay -- "peer public key" --> alice
   relay -- "peer public key" --> bob
-  alice -- "ciphertext only" --> relay
-  relay -- "ciphertext only" --> bob
-  bob -- "ciphertext only" --> relay
-  relay -- "ciphertext only" --> alice
+  alice -- "POST ciphertext only" --> relay
+  relay -- "SSE ciphertext only" --> bob
+  bob -- "POST ciphertext only" --> relay
+  relay -- "SSE ciphertext only" --> alice
 ```
 
-The important boundary is between the browser and the relay. The browser can see plaintext because it owns the user's input and local cryptographic keys. The relay only sees room IDs, client IDs, public keys, initialization vectors, ciphertext payloads, and timestamps.
+The important boundary is between the browser and the relay route handlers. The browser can see plaintext because it owns the user's input and local cryptographic keys. The route handlers only see room IDs, client IDs, public keys, initialization vectors, ciphertext payloads, and timestamps.
 
 ## Root Scripts
 
@@ -50,9 +50,8 @@ The root [package.json](../package.json) exposes the common workflow:
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Runs the web app and WebSocket relay at the same time with `concurrently`. |
+| `npm run dev` | Runs the Next.js app. |
 | `npm run dev:web` | Runs only the Next.js app. |
-| `npm run dev:ws` | Runs only the WebSocket relay. |
 | `npm run build` | Builds every workspace that has a `build` script. |
 | `npm run lint` | Runs linting in workspaces that define linting. |
 | `npm run typecheck` | Runs TypeScript checks across workspaces. |
@@ -61,9 +60,9 @@ The root [package.json](../package.json) exposes the common workflow:
 
 The app uses four important categories of data:
 
-| Data | Created In | Sent To Relay | Purpose |
+| Data | Created In | Sent To Route Handlers | Purpose |
 | --- | --- | --- | --- |
-| Client ID | Browser | Yes | Identifies which socket sent a message. |
+| Client ID | Browser | Yes | Identifies which browser client sent a message. |
 | Room ID | Browser | Yes | Groups peers into a chat room. |
 | Public key | Browser | Yes | Allows peers to derive a shared key. |
 | Private key | Browser | No | Used locally to derive the shared key. |
@@ -80,15 +79,15 @@ sequenceDiagram
   participant B as Browser B
 
   A->>A: Generate ECDH key pair
-  A->>S: Join room with public key
+  A->>S: Open SSE stream with public key
   B->>B: Generate ECDH key pair
-  B->>S: Join same room with public key
+  B->>S: Open SSE stream with public key
   S->>A: Send Browser B public key
   S->>B: Send Browser A public key
   A->>A: Derive shared AES-GCM key
   B->>B: Derive shared AES-GCM key
   A->>A: Encrypt plaintext
-  A->>S: Send ciphertext
-  S->>B: Forward ciphertext
+  A->>S: POST ciphertext
+  S->>B: Stream ciphertext over SSE
   B->>B: Decrypt and render plaintext
 ```

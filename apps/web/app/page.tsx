@@ -24,7 +24,6 @@ import {
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type WireMessage =
-  | { type: "join"; roomId: string; senderId: string; publicKey: JsonWebKey }
   | { type: "peer"; senderId: string; publicKey: JsonWebKey }
   | { type: "ciphertext"; senderId: string; iv: string; payload: string; sentAt: string }
   | { type: "system"; message: string };
@@ -35,8 +34,6 @@ type ChatMessage = {
   text: string;
   sentAt: string;
 };
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001";
 
 function bytesToBase64(bytes: ArrayBuffer | Uint8Array) {
   const values = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -126,9 +123,7 @@ export default function Home() {
   const [status, setStatus] = useState("Generating local key pair");
   const [peerReady, setPeerReady] = useState(false);
   const [clientId] = useState(() => crypto.randomUUID());
-  const socketRef = useRef<WebSocket | null>(null);
   const privateKeyRef = useRef<CryptoKey | null>(null);
-  const publicKeyRef = useRef<JsonWebKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -140,7 +135,7 @@ export default function Home() {
 
   useEffect(() => {
     let isMounted = true;
-    let socket: WebSocket;
+    let eventSource: EventSource;
 
     async function connect() {
       setPeerReady(false);
@@ -152,23 +147,16 @@ export default function Home() {
       }
 
       privateKeyRef.current = identity.pair.privateKey;
-      publicKeyRef.current = identity.publicKey;
-      socket = new WebSocket(WS_URL);
-      socketRef.current = socket;
+      const eventsUrl = `/api/rooms/${encodeURIComponent(roomId)}/events?clientId=${encodeURIComponent(
+        clientId
+      )}&publicKey=${encodeURIComponent(JSON.stringify(identity.publicKey))}`;
+      eventSource = new EventSource(eventsUrl);
 
-      socket.addEventListener("open", () => {
+      eventSource.addEventListener("open", () => {
         setStatus(`Connected to ${roomId}`);
-        socket.send(
-          JSON.stringify({
-            type: "join",
-            roomId,
-            senderId: clientId,
-            publicKey: identity.publicKey
-          })
-        );
       });
 
-      socket.addEventListener("message", async (event) => {
+      eventSource.addEventListener("message", async (event) => {
         const message = JSON.parse(event.data) as WireMessage;
         if ("senderId" in message && message.senderId === clientId) {
           return;
@@ -211,13 +199,9 @@ export default function Home() {
         }
       });
 
-      socket.addEventListener("close", () => {
+      eventSource.addEventListener("error", () => {
         setStatus("Disconnected");
         setPeerReady(false);
-      });
-
-      socket.addEventListener("error", () => {
-        setStatus("WebSocket connection error");
       });
     }
 
@@ -225,31 +209,39 @@ export default function Home() {
 
     return () => {
       isMounted = false;
-      socketRef.current = null;
-      socket?.close();
+      eventSource?.close();
     };
   }, [clientId, roomId]);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = text.trim();
-    const socket = socketRef.current;
     const sharedKey = sharedKeyRef.current;
 
-    if (!trimmed || !socket || socket.readyState !== WebSocket.OPEN || !sharedKey) {
+    if (!trimmed || !sharedKey) {
       return;
     }
 
     const sentAt = new Date().toISOString();
     const encrypted = await encryptText(sharedKey, trimmed);
-    socket.send(
-      JSON.stringify({
+    const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
         type: "ciphertext",
         senderId: clientId,
         sentAt,
         ...encrypted
       })
-    );
+    });
+
+    if (!response.ok) {
+      setStatus("Message send failed");
+      return;
+    }
+
     setMessages((current) => [
       ...current,
       {
