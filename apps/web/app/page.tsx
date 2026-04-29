@@ -3,6 +3,8 @@
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
 import LockIcon from "@mui/icons-material/Lock";
+import PauseIcon from "@mui/icons-material/Pause";
+import RadioIcon from "@mui/icons-material/Radio";
 import SendIcon from "@mui/icons-material/Send";
 import SyncIcon from "@mui/icons-material/Sync";
 import {
@@ -36,6 +38,8 @@ type ChatMessage = {
   text: string;
   sentAt: string;
 };
+
+const DEFCON_RADIO_STREAM_URL = "https://ice2.somafm.com/defcon-128-mp3";
 
 const ui = {
   pageShell: {
@@ -266,9 +270,12 @@ export default function Home() {
   const [status, setStatus] = useState("Generating local key pair");
   const [peerReady, setPeerReady] = useState(false);
   const [clientId, setClientId] = useState("");
+  const [radioPlaying, setRadioPlaying] = useState(false);
+  const [radioStatus, setRadioStatus] = useState("Idle");
   const privateKeyRef = useRef<CryptoKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const radioRef = useRef<HTMLAudioElement | null>(null);
 
   const shortClientId = useMemo(() => clientId.slice(0, 8) || "pending", [clientId]);
 
@@ -419,8 +426,50 @@ export default function Home() {
     }
   }
 
+  async function toggleRadio() {
+    const radio = radioRef.current;
+    if (!radio) {
+      return;
+    }
+
+    if (radioPlaying) {
+      radio.pause();
+      radio.currentTime = 0;
+      setRadioPlaying(false);
+      setRadioStatus("Idle");
+      return;
+    }
+
+    try {
+      setRadioStatus("Connecting");
+      await radio.play();
+      setRadioPlaying(true);
+      setRadioStatus("Streaming");
+    } catch {
+      setRadioPlaying(false);
+      setRadioStatus("Blocked");
+    }
+  }
+
   return (
     <Box sx={ui.pageShell}>
+      <audio
+        ref={radioRef}
+        src={DEFCON_RADIO_STREAM_URL}
+        preload="none"
+        onPlaying={() => {
+          setRadioPlaying(true);
+          setRadioStatus("Streaming");
+        }}
+        onPause={() => {
+          setRadioPlaying(false);
+          setRadioStatus("Idle");
+        }}
+        onError={() => {
+          setRadioPlaying(false);
+          setRadioStatus("Unavailable");
+        }}
+      />
       <AppBar
         position="static"
         elevation={0}
@@ -489,6 +538,41 @@ export default function Home() {
                     <SyncIcon />
                   </IconButton>
                 </Tooltip>
+              </Stack>
+
+              <Divider sx={ui.divider} />
+
+              <Stack spacing={1.25}>
+                <SectionLabel>DEF CON Radio</SectionLabel>
+                <Box
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 2,
+                    border: "1px solid rgba(210, 236, 255, 0.1)",
+                    background: "rgba(255, 255, 255, 0.035)"
+                  }}
+                >
+                  <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
+                    <RadioIcon color="primary" fontSize="small" />
+                    <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                        SomaFM DEF CON
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {radioStatus}
+                      </Typography>
+                    </Box>
+                    <Tooltip title={radioPlaying ? "Stop stream" : "Start stream"}>
+                      <IconButton
+                        color="primary"
+                        onClick={toggleRadio}
+                        aria-label={radioPlaying ? "Stop DEF CON Radio" : "Start DEF CON Radio"}
+                      >
+                        {radioPlaying ? <PauseIcon /> : <RadioIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Box>
               </Stack>
 
               <Divider sx={ui.divider} />
