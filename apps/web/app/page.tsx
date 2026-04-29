@@ -122,12 +122,16 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState("Generating local key pair");
   const [peerReady, setPeerReady] = useState(false);
-  const [clientId] = useState(() => crypto.randomUUID());
+  const [clientId, setClientId] = useState("");
   const privateKeyRef = useRef<CryptoKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const shortClientId = useMemo(() => clientId.slice(0, 8), [clientId]);
+  const shortClientId = useMemo(() => clientId.slice(0, 8) || "pending", [clientId]);
+
+  useEffect(() => {
+    queueMicrotask(() => setClientId(crypto.randomUUID()));
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -138,6 +142,10 @@ export default function Home() {
     let eventSource: EventSource;
 
     async function connect() {
+      if (!clientId) {
+        return;
+      }
+
       setPeerReady(false);
       sharedKeyRef.current = null;
       setStatus("Generating local key pair");
@@ -218,7 +226,7 @@ export default function Home() {
     const trimmed = text.trim();
     const sharedKey = sharedKeyRef.current;
 
-    if (!trimmed || !sharedKey) {
+    if (!trimmed || !sharedKey || !clientId) {
       return;
     }
 
@@ -323,9 +331,15 @@ export default function Home() {
                     {shortClientId}
                   </Typography>
                   <Tooltip title="Copy client id">
-                    <IconButton size="small" onClick={() => navigator.clipboard.writeText(clientId)}>
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!clientId}
+                        onClick={() => navigator.clipboard.writeText(clientId)}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </Stack>
               </Stack>
