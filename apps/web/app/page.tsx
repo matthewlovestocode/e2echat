@@ -44,7 +44,20 @@ type ChatMessage = {
   sentAt: string;
 };
 
+type SomaChannel = {
+  id: string;
+  listeners?: string;
+  lastPlaying?: string;
+};
+
+type RadioTrack = {
+  artist: string;
+  title: string;
+  listeners?: string;
+};
+
 const DEFCON_RADIO_STREAM_URL = "https://ice2.somafm.com/defcon-128-mp3";
+const SOMAFM_CHANNELS_URL = "https://api.somafm.com/channels.json";
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://detutdxfzmictmjctfyf.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY =
@@ -303,6 +316,29 @@ async function decryptText(key: CryptoKey, iv: string, payload: string) {
   return new TextDecoder().decode(decrypted);
 }
 
+function parseSomaTrack(channel: SomaChannel): RadioTrack | null {
+  if (!channel.lastPlaying) {
+    return null;
+  }
+
+  const [artist, ...titleParts] = channel.lastPlaying.split(" - ");
+  const title = titleParts.join(" - ");
+
+  if (!artist || !title) {
+    return {
+      artist: "SomaFM DEF CON",
+      title: channel.lastPlaying,
+      listeners: channel.listeners
+    };
+  }
+
+  return {
+    artist,
+    title,
+    listeners: channel.listeners
+  };
+}
+
 export default function Home() {
   const [roomId, setRoomId] = useState("demo-room");
   const [draftRoomId, setDraftRoomId] = useState("demo-room");
@@ -313,6 +349,7 @@ export default function Home() {
   const [clientId, setClientId] = useState("");
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioStatus, setRadioStatus] = useState("Idle");
+  const [radioTrack, setRadioTrack] = useState<RadioTrack | null>(null);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [roomActionStatus, setRoomActionStatus] = useState("Create a room, then share its link.");
   const privateKeyRef = useRef<CryptoKey | null>(null);
@@ -341,6 +378,46 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!radioPlaying) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    let metadataTimer: ReturnType<typeof setInterval>;
+
+    async function loadTrack() {
+      try {
+        const response = await fetch(SOMAFM_CHANNELS_URL, {
+          signal: abortController.signal,
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { channels?: SomaChannel[] };
+        const defconChannel = data.channels?.find((channel) => channel.id === "defcon");
+        if (defconChannel) {
+          setRadioTrack(parseSomaTrack(defconChannel));
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.warn("Unable to load SomaFM track metadata", error);
+        }
+      }
+    }
+
+    loadTrack();
+    metadataTimer = setInterval(loadTrack, 20000);
+
+    return () => {
+      abortController.abort();
+      clearInterval(metadataTimer);
+    };
+  }, [radioPlaying]);
 
   useEffect(() => {
     let isMounted = true;
@@ -550,6 +627,7 @@ export default function Home() {
       radio.currentTime = 0;
       setRadioPlaying(false);
       setRadioStatus("Idle");
+      setRadioTrack(null);
       return;
     }
 
@@ -577,10 +655,12 @@ export default function Home() {
         onPause={() => {
           setRadioPlaying(false);
           setRadioStatus("Idle");
+          setRadioTrack(null);
         }}
         onError={() => {
           setRadioPlaying(false);
           setRadioStatus("Unavailable");
+          setRadioTrack(null);
         }}
       />
       <AppBar
@@ -732,6 +812,37 @@ export default function Home() {
                       <Typography variant="caption" color="text.secondary">
                         {radioStatus}
                       </Typography>
+                      {radioPlaying && (
+                        <Stack spacing={0.25} sx={{ mt: 0.75 }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "primary.light",
+                              display: "block",
+                              fontWeight: 800,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap"
+                            }}
+                          >
+                            {radioTrack?.title ?? "Loading track..."}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{
+                              display: "block",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap"
+                            }}
+                          >
+                            {radioTrack
+                              ? `${radioTrack.artist}${radioTrack.listeners ? ` - ${radioTrack.listeners} listeners` : ""}`
+                              : "SomaFM track metadata"}
+                          </Typography>
+                        </Stack>
+                      )}
                     </Box>
                     <Tooltip title={radioPlaying ? "Stop stream" : "Start stream"}>
                       <IconButton
