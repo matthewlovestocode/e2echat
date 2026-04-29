@@ -3,6 +3,7 @@
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyIcon from "@mui/icons-material/Key";
+import LinkIcon from "@mui/icons-material/Link";
 import PauseIcon from "@mui/icons-material/Pause";
 import RadioIcon from "@mui/icons-material/Radio";
 import SendIcon from "@mui/icons-material/Send";
@@ -295,6 +296,7 @@ export default function Home() {
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioStatus, setRadioStatus] = useState("Idle");
   const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [roomActionStatus, setRoomActionStatus] = useState("Create a room, then share its link.");
   const privateKeyRef = useRef<CryptoKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -305,10 +307,14 @@ export default function Home() {
   useEffect(() => {
     queueMicrotask(() => {
       const nextClientId = crypto.randomUUID();
-      const nextRoomId = `demo-${nextClientId.slice(0, 6)}`;
+      const requestedRoom = new URLSearchParams(window.location.search).get("room")?.trim();
+      const nextRoomId = requestedRoom || `demo-${nextClientId.slice(0, 6)}`;
       setClientId(nextClientId);
       setRoomId(nextRoomId);
       setDraftRoomId(nextRoomId);
+      setRoomActionStatus(
+        requestedRoom ? `Joined shared room ${nextRoomId}.` : "Created a private room for this tab."
+      );
     });
   }, []);
 
@@ -328,6 +334,7 @@ export default function Home() {
       setPeerReady(false);
       sharedKeyRef.current = null;
       setStatus("Generating local key pair");
+      setRoomActionStatus(`Opening room ${roomId}.`);
       const identity = await createIdentity();
       if (!isMounted) {
         return;
@@ -341,6 +348,7 @@ export default function Home() {
 
       eventSource.addEventListener("open", () => {
         setStatus(`Connected to ${roomId}`);
+        setRoomActionStatus(`Room ${roomId} is ready. Share the link with another client.`);
       });
 
       eventSource.addEventListener("message", async (event) => {
@@ -353,6 +361,7 @@ export default function Home() {
           sharedKeyRef.current = await deriveSharedKey(identity.pair.privateKey, message.publicKey);
           setPeerReady(true);
           setStatus("Secure session established");
+          setRoomActionStatus("Peer connected. Encrypted session established.");
           return;
         }
 
@@ -389,6 +398,7 @@ export default function Home() {
       eventSource.addEventListener("error", () => {
         setStatus("Disconnected");
         setPeerReady(false);
+        setRoomActionStatus("Room connection interrupted. Rejoin or create a new room.");
       });
     }
 
@@ -446,7 +456,26 @@ export default function Home() {
     if (nextRoom) {
       setMessages([]);
       setRoomId(nextRoom);
+      setPeerReady(false);
+      setRoomActionStatus(`Joining room ${nextRoom}.`);
+      window.history.replaceState(null, "", `?room=${encodeURIComponent(nextRoom)}`);
     }
+  }
+
+  function createNewRoom() {
+    const nextRoom = `matrix-${crypto.randomUUID().slice(0, 8)}`;
+    setMessages([]);
+    setDraftRoomId(nextRoom);
+    setRoomId(nextRoom);
+    setPeerReady(false);
+    setRoomActionStatus(`Created room ${nextRoom}. Share its link with another client.`);
+    window.history.replaceState(null, "", `?room=${encodeURIComponent(nextRoom)}`);
+  }
+
+  async function copyRoomLink() {
+    const roomUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomId)}`;
+    await navigator.clipboard.writeText(roomUrl);
+    setRoomActionStatus("Room link copied. Open it in another browser or send it to a peer.");
   }
 
   async function toggleRadio() {
@@ -548,7 +577,44 @@ export default function Home() {
                 </Typography>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: "1px solid rgba(210, 236, 255, 0.1)",
+                  background: "rgba(255, 255, 255, 0.035)"
+                }}
+              >
+                <Stack spacing={1.25}>
+                  <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Active room
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={peerReady ? "Peer online" : "Solo"}
+                      color={peerReady ? "success" : "warning"}
+                      variant="outlined"
+                      sx={{ fontWeight: 800 }}
+                    />
+                  </Stack>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "primary.light",
+                      fontFamily: "monospace",
+                      overflowWrap: "anywhere"
+                    }}
+                  >
+                    {roomId}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {roomActionStatus}
+                  </Typography>
+                </Stack>
+              </Box>
+
+              <Stack spacing={1}>
                 <TextField
                   label="Room"
                   size="small"
@@ -556,11 +622,32 @@ export default function Home() {
                   onChange={(event) => setDraftRoomId(event.target.value)}
                   fullWidth
                 />
-                <Tooltip title="Join room">
-                  <IconButton color="primary" onClick={changeRoom} aria-label="Join room">
-                    <SyncIcon />
-                  </IconButton>
-                </Tooltip>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<SyncIcon />}
+                    onClick={changeRoom}
+                    disabled={!draftRoomId.trim() || draftRoomId.trim() === roomId}
+                    fullWidth
+                  >
+                    Join
+                  </Button>
+                  <Button variant="outlined" onClick={createNewRoom} fullWidth>
+                    New
+                  </Button>
+                  <Tooltip title="Copy room link">
+                    <span>
+                      <IconButton
+                        color="primary"
+                        onClick={copyRoomLink}
+                        aria-label="Copy room link"
+                        disabled={!roomId}
+                      >
+                        <LinkIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
               </Stack>
 
               <Divider sx={ui.divider} />
@@ -737,8 +824,9 @@ export default function Home() {
         <DialogTitle>Connection instructions</DialogTitle>
         <DialogContent>
           <Typography color="text.secondary">
-            Open this app in another browser window with the same room name to exchange encrypted
-            messages through the relay.
+            Create a room, copy its room link, and open that link in another browser window or send it
+            to another client. Both clients must be in the same room before encrypted messages can move
+            through the relay.
           </Typography>
         </DialogContent>
         <DialogActions>
