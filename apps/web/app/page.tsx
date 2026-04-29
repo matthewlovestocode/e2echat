@@ -1,18 +1,22 @@
 "use client";
 
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyIcon from "@mui/icons-material/Key";
 import PauseIcon from "@mui/icons-material/Pause";
 import RadioIcon from "@mui/icons-material/Radio";
 import SendIcon from "@mui/icons-material/Send";
 import SyncIcon from "@mui/icons-material/Sync";
 import {
-  Alert,
   AppBar,
   Box,
   Button,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   Paper,
@@ -290,6 +294,7 @@ export default function Home() {
   const [clientId, setClientId] = useState("");
   const [radioPlaying, setRadioPlaying] = useState(false);
   const [radioStatus, setRadioStatus] = useState("Idle");
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
   const privateKeyRef = useRef<CryptoKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -596,7 +601,19 @@ export default function Home() {
               <Divider sx={ui.divider} />
 
               <Stack spacing={1}>
-                <SectionLabel>Identity</SectionLabel>
+                <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <SectionLabel>Identity</SectionLabel>
+                  <Tooltip title="Connection instructions">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => setInstructionsOpen(true)}
+                      aria-label="Open connection instructions"
+                    >
+                      <InfoOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <KeyIcon fontSize="small" color="primary" />
                   <Typography
@@ -622,11 +639,6 @@ export default function Home() {
                   </Tooltip>
                 </Stack>
               </Stack>
-
-              <Alert severity="info">
-                Open this app in another browser window with the same room name to exchange encrypted
-                messages through the relay.
-              </Alert>
             </Stack>
           </GlassPanel>
 
@@ -704,6 +716,37 @@ export default function Home() {
           </GlassPanel>
         </Box>
       </Container>
+
+      <Dialog
+        open={instructionsOpen}
+        onClose={() => setInstructionsOpen(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              border: "1px solid rgba(210, 236, 255, 0.14)",
+              backgroundColor: "rgba(3, 8, 18, 0.78)",
+              backgroundImage:
+                "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018))",
+              backdropFilter: "blur(20px) saturate(120%)",
+              WebkitBackdropFilter: "blur(20px) saturate(120%)",
+              boxShadow: "0 24px 72px rgba(0, 0, 0, 0.46)"
+            }
+          }
+        }}
+      >
+        <DialogTitle>Connection instructions</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Open this app in another browser window with the same room name to exchange encrypted
+            messages through the relay.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInstructionsOpen(false)} autoFocus>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
