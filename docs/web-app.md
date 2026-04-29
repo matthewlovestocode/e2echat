@@ -7,10 +7,7 @@ The web app lives in [apps/web](../apps/web). It is a Next.js App Router applica
 | File | Purpose |
 | --- | --- |
 | `app/layout.tsx` | Defines the root HTML shell, Material UI cache provider, theme provider, and CSS reset. |
-| `app/page.tsx` | Contains the chat UI, SSE connection, key exchange, encryption, decryption, HTTP sends, and message state. |
-| `app/api/rooms/[roomId]/events/route.ts` | Opens the SSE stream for a room and announces peer public keys. |
-| `app/api/rooms/[roomId]/messages/route.ts` | Accepts encrypted message POSTs and relays them to room peers. |
-| `app/api/rooms/[roomId]/store.ts` | Holds in-memory room membership and SSE controllers. |
+| `app/page.tsx` | Contains the chat UI, Supabase Realtime room channel, key exchange, encryption, decryption, and message state. |
 | `app/theme.ts` | Defines the Material UI theme used by the app. |
 | `app/globals.css` | Provides small global CSS defaults. |
 | `eslint.config.mjs` | Configures ESLint with Next.js core web vitals rules. |
@@ -21,7 +18,7 @@ The web app lives in [apps/web](../apps/web). It is a Next.js App Router applica
 
 The top of `page.tsx` contains `"use client";` because the page depends on browser-only APIs:
 
-- `EventSource`
+- Supabase Realtime browser client.
 - `crypto.subtle`
 - `crypto.randomUUID`
 - `btoa`
@@ -36,7 +33,7 @@ The page uses React state for values that affect rendering:
 
 | State | Purpose |
 | --- | --- |
-| `roomId` | The active room connected through the SSE relay. |
+| `roomId` | The active Supabase Realtime room channel. |
 | `draftRoomId` | The editable room field before the user joins a new room. |
 | `text` | The current message input. |
 | `messages` | The rendered chat transcript. |
@@ -58,17 +55,17 @@ The main `useEffect` runs when the component mounts or when `roomId` changes. It
 
 1. Reset peer readiness and shared-key state.
 2. Generate a fresh local ECDH identity.
-3. Open an `EventSource` connection to the room events route.
-4. Register handlers for `open`, `message`, and `error`.
+3. Subscribe to a Supabase Realtime room channel.
+4. Register handlers for `peer`, `ciphertext`, and `system` broadcasts.
 
 ```mermaid
 flowchart TD
   mount["Component mounts or room changes"]
   reset["Reset peer readiness"]
   identity["Generate identity"]
-  events["Open EventSource"]
-  open["On open: mark room connected"]
-  message["On message: handle peer, ciphertext, or system event"]
+  events["Subscribe to Supabase channel"]
+  open["On subscribed: broadcast public key"]
+  message["On broadcast: handle peer, ciphertext, or system event"]
   cleanup["Cleanup: close event stream"]
 
   mount --> reset --> identity --> events --> open
@@ -76,17 +73,17 @@ flowchart TD
   mount --> cleanup
 ```
 
-The cleanup step matters because changing rooms should close the previous event stream. Without cleanup, one browser tab could accidentally remain subscribed to multiple rooms.
+The cleanup step matters because changing rooms should remove the previous Supabase channel. Without cleanup, one browser tab could accidentally remain subscribed to multiple rooms.
 
 ## Message Handling
 
-The EventSource `message` handler expects the relay to send one of these message types:
+The Supabase broadcast handlers expect these message types:
 
 | Type | Meaning |
 | --- | --- |
 | `peer` | A peer in the room has shared its public key. The client derives a shared AES-GCM key. |
 | `ciphertext` | A peer sent an encrypted chat message. The client decrypts and renders it. |
-| `system` | The relay sent a room event such as a peer joining or leaving. |
+| `system` | A room event such as a peer joining or leaving. |
 
 The browser ignores messages whose `senderId` matches its own `clientId`. That prevents a client from rendering its own relayed message twice.
 
@@ -112,10 +109,6 @@ The left session panel shows connection status, room controls, and the current c
 
 ## Sending Messages
 
-The browser sends encrypted messages with `fetch`:
-
-```text
-POST /api/rooms/:roomId/messages
-```
+The browser sends encrypted messages with `channel.send({ type: "broadcast", event: "ciphertext", ... })`.
 
 The payload contains the sender ID, timestamp, AES-GCM initialization vector, and ciphertext payload. It does not contain the plaintext message.

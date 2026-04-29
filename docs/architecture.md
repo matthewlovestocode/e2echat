@@ -1,6 +1,6 @@
 # Architecture
 
-The repository is an npm workspaces monorepo. The root owns shared scripts and dependency installation. The current runtime is a single Next.js app so it can deploy to Vercel without a separate WebSocket process.
+The repository is an npm workspaces monorepo. The root owns shared scripts and dependency installation. The current runtime is a single Next.js app with Supabase Realtime for shared room transport.
 
 ```mermaid
 flowchart TD
@@ -9,40 +9,40 @@ flowchart TD
   lockfile["package-lock.json\nresolved dependency graph"]
   docs["docs/\nproject documentation"]
   web["apps/web\nNext.js + Material UI client"]
-  api["apps/web/app/api\nSSE + HTTP relay routes"]
+  realtime["Supabase Realtime\nroom broadcast transport"]
 
   repo --> rootPkg
   repo --> lockfile
   repo --> docs
   repo --> web
-  web --> api
+  web --> realtime
 ```
 
 ## Runtime App
 
-`apps/web` is the user-facing chat client and the relay host. It runs through Next.js, uses Material UI for layout, and exposes route handlers under `app/api`.
+`apps/web` is the user-facing chat client. It runs through Next.js and uses Material UI for layout.
 
-The browser is responsible for all encryption and decryption. The route handlers keep room membership in memory, stream peer events with Server-Sent Events, and accept encrypted messages through HTTP POST.
+The browser is responsible for all encryption and decryption. Supabase Realtime carries public keys and ciphertext between clients in the same room.
 
 ## Runtime Communication
 
 ```mermaid
 flowchart LR
   alice["Browser A\napps/web"]
-  relay["Next route handlers\nSSE + POST"]
+  relay["Supabase Realtime\nbroadcast channel"]
   bob["Browser B\napps/web"]
 
-  alice -- "EventSource: room + public key" --> relay
-  bob -- "EventSource: room + public key" --> relay
+  alice -- "subscribe + public key broadcast" --> relay
+  bob -- "subscribe + public key broadcast" --> relay
   relay -- "peer public key" --> alice
   relay -- "peer public key" --> bob
-  alice -- "POST ciphertext only" --> relay
-  relay -- "SSE ciphertext only" --> bob
-  bob -- "POST ciphertext only" --> relay
-  relay -- "SSE ciphertext only" --> alice
+  alice -- "ciphertext broadcast" --> relay
+  relay -- "ciphertext broadcast" --> bob
+  bob -- "ciphertext broadcast" --> relay
+  relay -- "ciphertext broadcast" --> alice
 ```
 
-The important boundary is between the browser and the relay route handlers. The browser can see plaintext because it owns the user's input and local cryptographic keys. The route handlers only see room IDs, client IDs, public keys, initialization vectors, ciphertext payloads, and timestamps.
+The important boundary is between the browser and Supabase Realtime. The browser can see plaintext because it owns the user's input and local cryptographic keys. Supabase only sees room IDs, client IDs, public keys, initialization vectors, ciphertext payloads, and timestamps.
 
 ## Root Scripts
 
@@ -60,7 +60,7 @@ The root [package.json](../package.json) exposes the common workflow:
 
 The app uses four important categories of data:
 
-| Data | Created In | Sent To Route Handlers | Purpose |
+| Data | Created In | Sent To Supabase | Purpose |
 | --- | --- | --- | --- |
 | Client ID | Browser | Yes | Identifies which browser client sent a message. |
 | Room ID | Browser | Yes | Groups peers into a chat room. |
@@ -79,15 +79,15 @@ sequenceDiagram
   participant B as Browser B
 
   A->>A: Generate ECDH key pair
-  A->>S: Open SSE stream with public key
+  A->>S: Subscribe and broadcast public key
   B->>B: Generate ECDH key pair
-  B->>S: Open SSE stream with public key
+  B->>S: Subscribe and broadcast public key
   S->>A: Send Browser B public key
   S->>B: Send Browser A public key
   A->>A: Derive shared AES-GCM key
   B->>B: Derive shared AES-GCM key
   A->>A: Encrypt plaintext
-  A->>S: POST ciphertext
-  S->>B: Stream ciphertext over SSE
+  A->>S: Broadcast ciphertext
+  S->>B: Deliver ciphertext broadcast
   B->>B: Decrypt and render plaintext
 ```

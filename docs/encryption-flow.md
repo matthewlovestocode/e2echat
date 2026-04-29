@@ -1,6 +1,6 @@
 # Encryption Flow
 
-The cryptography lives in the browser client at [apps/web/app/page.tsx](../apps/web/app/page.tsx). The route handlers never receive private keys, shared keys, or plaintext messages.
+The cryptography lives in the browser client at [apps/web/app/page.tsx](../apps/web/app/page.tsx). Supabase never receives private keys, shared keys, or plaintext messages.
 
 ## Algorithms Used
 
@@ -17,7 +17,7 @@ The demo uses the browser Web Crypto API:
 
 ## Key Creation
 
-When the page connects to a room, the client calls `createIdentity()`. This generates an ECDH P-256 key pair. The public key is exported as a JSON Web Key so it can be serialized into the SSE subscription request. The private key stays inside the browser and is stored in a React ref.
+When the page connects to a room, the client calls `createIdentity()`. This generates an ECDH P-256 key pair. The public key is exported as a JSON Web Key so it can be broadcast through Supabase Realtime. The private key stays inside the browser and is stored in a React ref.
 
 ```mermaid
 flowchart TD
@@ -25,7 +25,7 @@ flowchart TD
   generate["Generate ECDH P-256 key pair"]
   export["Export public key as JWK"]
   keep["Keep private key in browser ref"]
-  join["Open SSE stream with room ID, client ID, public key"]
+  join["Subscribe to room and broadcast public key"]
 
   load --> generate --> export --> join
   generate --> keep
@@ -62,26 +62,24 @@ When the user sends a message:
 4. It UTF-8 encodes the plaintext.
 5. It encrypts the encoded text with the shared AES-GCM key.
 6. It base64-encodes the initialization vector and ciphertext so they fit cleanly in JSON.
-7. It sends a `ciphertext` message to the room's HTTP POST endpoint.
+7. It broadcasts a `ciphertext` message to the Supabase room channel.
 8. It appends the plaintext to the local message list as the sender's own message.
 
 ```mermaid
 sequenceDiagram
   participant UI as Message form
   participant Crypto as Browser crypto
-  participant HTTP as HTTP POST
-  participant Relay as Route handler relay
+  participant Realtime as Supabase Realtime
 
   UI->>Crypto: Submit plaintext
   Crypto->>Crypto: Generate random IV
   Crypto->>Crypto: Encrypt with AES-GCM
-  Crypto->>HTTP: Return base64 IV and ciphertext
-  HTTP->>Relay: POST ciphertext message
+  Crypto->>Realtime: Broadcast base64 IV and ciphertext
 ```
 
 ## Message Decryption
 
-When a browser receives a `ciphertext` event from the SSE stream:
+When a browser receives a `ciphertext` event from Supabase Realtime:
 
 1. It ignores messages sent by the same `clientId`.
 2. It checks that a shared key has been derived.
@@ -109,7 +107,7 @@ flowchart TD
 
 ## Why Base64 Is Used
 
-Web Crypto returns binary data. The route handlers exchange JSON payloads and SSE frames. JSON cannot directly represent arbitrary bytes, so the client converts binary data into base64 strings before sending. On receive, it converts those base64 strings back into bytes before decrypting.
+Web Crypto returns binary data. Supabase Realtime exchanges JSON payloads. JSON cannot directly represent arbitrary bytes, so the client converts binary data into base64 strings before sending. On receive, it converts those base64 strings back into bytes before decrypting.
 
 ## Security Notes
 

@@ -29,8 +29,7 @@ Default local endpoints:
 | Service | URL |
 | --- | --- |
 | Web app | `http://localhost:3000` |
-| SSE events route | `http://localhost:3000/api/rooms/:roomId/events` |
-| Message POST route | `http://localhost:3000/api/rooms/:roomId/messages` |
+| Supabase Realtime | `room:<roomId>` broadcast channel |
 
 To test the chat flow, open `http://localhost:3000` in two browser windows or tabs. Keep the same room name in both windows. Once both clients exchange public keys, the status chip changes from waiting to encrypted.
 
@@ -62,9 +61,9 @@ Most UI changes happen in [apps/web/app/page.tsx](../apps/web/app/page.tsx). The
 
 Edit [apps/web/app/theme.ts](../apps/web/app/theme.ts) to adjust colors, typography, spacing, or component defaults.
 
-### Change Relay Behavior
+### Change Realtime Behavior
 
-Edit [apps/web/app/api/rooms/[roomId]](../apps/web/app/api/rooms/%5BroomId%5D). Keep in mind that the relay should not receive plaintext or private keys. If a new message type is added, update the route-handler validation and the browser-side `WireMessage` type.
+Edit [apps/web/app/page.tsx](../apps/web/app/page.tsx). Keep in mind that Supabase should not receive plaintext or private keys. If a new message type is added, update the browser-side `WireMessage` type and channel handlers.
 
 ## Suggested Next Improvements
 
@@ -76,4 +75,4 @@ The current implementation is intentionally compact. Good next improvements woul
 - Add key verification so users can detect man-in-the-middle attacks.
 - Add authenticated room joins.
 - Add encrypted message persistence.
-- Replace the in-memory relay store with a shared pub/sub backend for production.
+- Add encrypted persistence if message history is needed.

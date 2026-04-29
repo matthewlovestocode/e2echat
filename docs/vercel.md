@@ -1,6 +1,6 @@
 # Vercel Deployment
 
-The app is now designed to deploy to Vercel as a single Next.js project. It does not require a separate WebSocket server.
+The app is designed to deploy to Vercel as a single Next.js project. It does not require a separate WebSocket server, and room transport is handled by Supabase Realtime.
 
 ## What Runs on Vercel
 
@@ -9,16 +9,15 @@ flowchart TD
   browserA["Browser A"]
   browserB["Browser B"]
   next["Next.js app on Vercel"]
-  events["GET /api/rooms/:roomId/events\nSSE stream"]
-  messages["POST /api/rooms/:roomId/messages\nciphertext send"]
+  realtime["Supabase Realtime\nroom broadcast channel"]
 
   browserA --> next
   browserB --> next
-  next --> events
-  next --> messages
+  browserA --> realtime
+  browserB --> realtime
 ```
 
-The browser still performs all encryption and decryption. Vercel hosts the static UI and the dynamic route handlers used for room events.
+The browser still performs all encryption and decryption. Vercel hosts the UI; Supabase Realtime carries public keys and ciphertext between room clients.
 
 ## Deploy From GitHub
 
@@ -26,9 +25,17 @@ The browser still performs all encryption and decryption. Vercel hosts the stati
 2. Open Vercel and import `https://github.com/matthewlovestocode/e2echat`.
 3. Use the repository root as the project root.
 4. Keep the default framework preset as Next.js.
-5. Deploy.
+5. Add the Supabase environment variables.
+6. Deploy.
 
-No environment variables are required for the current local-room demo.
+Required environment variables:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://detutdxfzmictmjctfyf.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+```
+
+Do not add the Supabase secret key to Vercel for this app. The browser only needs the publishable key for Realtime Broadcast.
 
 ## Test the Deployment
 
@@ -42,13 +49,11 @@ After Vercel gives you a deployment URL:
 
 ## Important Limits
 
-This Vercel deployment mode is meant for testing the demo. It uses an in-memory room map inside the running function instance.
+Realtime delivery depends on the Supabase Realtime project being enabled and accepting public broadcast channels.
 
 That means:
 
-- Room state can disappear on cold starts or restarts.
-- Clients connected to different function instances may not see each other.
-- Long SSE streams are limited by Vercel Function duration limits.
 - Message history is not stored.
+- Broadcast delivery is realtime and ephemeral.
 
-For a production chat system, keep the browser-side encryption model but replace the in-memory relay with a shared realtime backend such as Redis pub/sub, a durable queue, or a hosted realtime service.
+For a production chat system, keep the browser-side encryption model and add authentication, key verification, and optional encrypted persistence.

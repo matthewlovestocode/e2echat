@@ -8,7 +8,7 @@ The application has one local service:
 
 | Service | What It Does | Default URL |
 | --- | --- | --- |
-| Next.js web app | Shows the chat UI, performs encryption in the browser, and hosts SSE/POST relay routes. | `http://localhost:3000` |
+| Next.js web app | Shows the chat UI, performs encryption in the browser, and uses Supabase Realtime for room transport. | `http://localhost:3000` |
 
 The usual command, `npm run dev`, starts the Next.js app.
 
@@ -16,7 +16,7 @@ The usual command, `npm run dev`, starts the Next.js app.
 flowchart LR
   command["npm run dev"]
   web["Next.js web app\nhttp://localhost:3000"]
-  api["Route handlers\nSSE receive + HTTP send"]
+  api["Supabase Realtime\nroom broadcasts"]
 
   command --> web
   web --> api
@@ -84,11 +84,19 @@ This installs:
 
 - Root development tooling.
 - Next.js and Material UI dependencies for `apps/web`.
-- Next.js route handlers used for room events and encrypted message sends.
+- Supabase Realtime client used for room events and encrypted message sends.
 
 The install may print funding information or audit warnings. Those messages do not prevent the app from running unless npm exits with an error.
 
 ## 4. Start the App
+
+The repository includes default public Supabase settings for the demo. If you want to point at a different Supabase project, create a local env file for the web app:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
+
+Then edit `apps/web/.env.local`. Do not put a Supabase secret key in this file because every `NEXT_PUBLIC_` value is exposed to the browser.
 
 Run the development command from the repository root:
 
@@ -96,7 +104,7 @@ Run the development command from the repository root:
 npm run dev
 ```
 
-This starts the web app and its API route handlers.
+This starts the web app. Room messages are carried by Supabase Realtime.
 
 You should see output like:
 
@@ -136,7 +144,7 @@ Keep both clients in the same room. The first window generates a room name like 
 
 Once the two clients see each other:
 
-- Each browser exchanges a public key through the SSE route.
+- Each browser exchanges a public key through Supabase Realtime.
 - Each browser derives the same shared encryption key locally.
 - The status changes to an encrypted or secure-session state.
 - The message input becomes enabled.
@@ -144,11 +152,11 @@ Once the two clients see each other:
 ```mermaid
 sequenceDiagram
   participant A as First browser tab
-  participant S as Next route handlers
+  participant S as Supabase Realtime
   participant B as Second browser tab
 
-  A->>S: Open SSE stream with public key
-  B->>S: Open SSE stream with public key
+  A->>S: Subscribe and broadcast public key
+  B->>S: Subscribe and broadcast public key
   S->>A: Send B public key
   S->>B: Send A public key
   A->>A: Derive shared AES-GCM key
@@ -167,14 +175,14 @@ In the second browser window:
 1. Confirm the message appears in the chat.
 2. Send a reply.
 
-The route-handler relay only receives encrypted payloads. The readable text is encrypted before it leaves the sending browser and decrypted after it reaches the receiving browser.
+Supabase Realtime only receives encrypted payloads. The readable text is encrypted before it leaves the sending browser and decrypted after it reaches the receiving browser.
 
 ```mermaid
 flowchart LR
   plain["Plaintext in sender browser"]
   encrypt["Encrypt with shared key"]
-  wire["Ciphertext over HTTP POST"]
-  relay["Relay streams ciphertext over SSE"]
+  wire["Ciphertext broadcast"]
+  relay["Supabase forwards ciphertext"]
   decrypt["Decrypt in receiver browser"]
   readable["Plaintext in receiver browser"]
 
@@ -228,9 +236,9 @@ Check these conditions:
 - The status says the encrypted session is established.
 - The message input is enabled.
 
-### Browser Console Shows an EventSource Error
+### Browser Console Shows Realtime Errors
 
-The local Next.js server may not be running, or the browser may have a stale connection. Start the app with:
+The local Next.js server may not be running, or Supabase Realtime may not be accepting the configured publishable key. Start the app with:
 
 ```bash
 npm run dev

@@ -28,6 +28,7 @@ import {
   Typography
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
+import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,6 +45,23 @@ type ChatMessage = {
 };
 
 const DEFCON_RADIO_STREAM_URL = "https://ice2.somafm.com/defcon-128-mp3";
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://detutdxfzmictmjctfyf.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  "sb_publishable_3FulVViS5beRWcKrEJS5Kw_NlL788Dy";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  }
+});
 
 const ui = {
   pageShell: {
@@ -299,6 +317,8 @@ export default function Home() {
   const [roomActionStatus, setRoomActionStatus] = useState("Create a room, then share its link.");
   const privateKeyRef = useRef<CryptoKey | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const knownPeerIdsRef = useRef<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const radioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -324,7 +344,7 @@ export default function Home() {
 
   useEffect(() => {
     let isMounted = true;
-    let eventSource: EventSource;
+    let channel: RealtimeChannel;
 
     async function connect() {
       if (!clientId) {
@@ -332,6 +352,7 @@ export default function Home() {
       }
 
       setPeerReady(false);
+      knownPeerIdsRef.current = new Set();
       sharedKeyRef.current = null;
       setStatus("Generating local key pair");
       setRoomActionStatus(`Opening room ${roomId}.`);
@@ -341,30 +362,54 @@ export default function Home() {
       }
 
       privateKeyRef.current = identity.pair.privateKey;
-      const eventsUrl = `/api/rooms/${encodeURIComponent(roomId)}/events?clientId=${encodeURIComponent(
-        clientId
-      )}&publicKey=${encodeURIComponent(JSON.stringify(identity.publicKey))}`;
-      eventSource = new EventSource(eventsUrl);
-
-      eventSource.addEventListener("open", () => {
-        setStatus(`Connected to ${roomId}`);
-        setRoomActionStatus(`Room ${roomId} is ready. Share the link with another client.`);
+      channel = supabase.channel(`room:${roomId}`, {
+        config: {
+          broadcast: {
+            self: false
+          }
+        }
       });
+      channelRef.current = channel;
 
-      eventSource.addEventListener("message", async (event) => {
-        const message = JSON.parse(event.data) as WireMessage;
+      async function announcePeer() {
+        await channel.send({
+          type: "broadcast",
+          event: "peer",
+          payload: {
+            type: "peer",
+            senderId: clientId,
+            publicKey: identity.publicKey
+          }
+        });
+      }
+
+      channel.on("broadcast", { event: "peer" }, async ({ payload }) => {
+        const message = payload as WireMessage;
         if ("senderId" in message && message.senderId === clientId) {
           return;
         }
 
         if (message.type === "peer") {
+          if (knownPeerIdsRef.current.has(message.senderId)) {
+            return;
+          }
+
+          knownPeerIdsRef.current.add(message.senderId);
           sharedKeyRef.current = await deriveSharedKey(identity.pair.privateKey, message.publicKey);
           setPeerReady(true);
           setStatus("Secure session established");
           setRoomActionStatus("Peer connected. Encrypted session established.");
+          await announcePeer();
           return;
         }
+      });
 
+      channel.on("broadcast", { event: "ciphertext" }, async ({ payload }) => {
+        const message = payload as WireMessage;
+        if ("senderId" in message && message.senderId === clientId) {
+          return;
+        }
+ 
         if (message.type === "ciphertext") {
           if (!sharedKeyRef.current) {
             return;
@@ -381,7 +426,10 @@ export default function Home() {
             }
           ]);
         }
+      });
 
+      channel.on("broadcast", { event: "system" }, ({ payload }) => {
+        const message = payload as WireMessage;
         if (message.type === "system") {
           setMessages((current) => [
             ...current,
@@ -395,10 +443,19 @@ export default function Home() {
         }
       });
 
-      eventSource.addEventListener("error", () => {
-        setStatus("Disconnected");
-        setPeerReady(false);
-        setRoomActionStatus("Room connection interrupted. Rejoin or create a new room.");
+      channel.subscribe(async (subscriptionStatus) => {
+        if (subscriptionStatus === "SUBSCRIBED") {
+          setStatus(`Connected to ${roomId}`);
+          setRoomActionStatus(`Room ${roomId} is ready. Share the link with another client.`);
+          await announcePeer();
+          return;
+        }
+
+        if (subscriptionStatus === "CHANNEL_ERROR" || subscriptionStatus === "TIMED_OUT") {
+          setStatus("Disconnected");
+          setPeerReady(false);
+          setRoomActionStatus("Room connection interrupted. Rejoin or create a new room.");
+        }
       });
     }
 
@@ -406,7 +463,12 @@ export default function Home() {
 
     return () => {
       isMounted = false;
-      eventSource?.close();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+      if (channelRef.current === channel) {
+        channelRef.current = null;
+      }
     };
   }, [clientId, roomId]);
 
@@ -414,27 +476,26 @@ export default function Home() {
     event.preventDefault();
     const trimmed = text.trim();
     const sharedKey = sharedKeyRef.current;
+    const channel = channelRef.current;
 
-    if (!trimmed || !sharedKey || !clientId) {
+    if (!trimmed || !sharedKey || !clientId || !channel) {
       return;
     }
 
     const sentAt = new Date().toISOString();
     const encrypted = await encryptText(sharedKey, trimmed);
-    const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
+    const response = await channel.send({
+      type: "broadcast",
+      event: "ciphertext",
+      payload: {
         type: "ciphertext",
         senderId: clientId,
         sentAt,
         ...encrypted
-      })
+      }
     });
 
-    if (!response.ok) {
+    if (response !== "ok") {
       setStatus("Message send failed");
       return;
     }

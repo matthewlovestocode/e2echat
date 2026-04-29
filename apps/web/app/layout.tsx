@@ -8,7 +8,7 @@ import { theme } from "./theme";
 
 export const metadata: Metadata = {
   title: "E2E Chat",
-  description: "End-to-end encrypted chat demo over Server-Sent Events"
+  description: "End-to-end encrypted chat demo over Supabase Realtime"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
