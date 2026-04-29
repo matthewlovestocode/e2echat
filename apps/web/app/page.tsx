@@ -21,7 +21,9 @@ import {
   Tooltip,
   Typography
 } from "@mui/material";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { SxProps, Theme } from "@mui/material/styles";
+import type { FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type WireMessage =
   | { type: "peer"; senderId: string; publicKey: JsonWebKey }
@@ -34,6 +36,147 @@ type ChatMessage = {
   text: string;
   sentAt: string;
 };
+
+const ui = {
+  pageShell: {
+    minHeight: "100vh",
+    bgcolor: "background.default",
+    backgroundImage:
+      "linear-gradient(135deg, rgba(5, 7, 15, 0.62) 0%, rgba(7, 17, 31, 0.38) 48%, rgba(5, 7, 15, 0.68) 100%), radial-gradient(circle at 18% 12%, rgba(25, 211, 255, 0.16), transparent 30%), radial-gradient(circle at 82% 18%, rgba(181, 108, 255, 0.13), transparent 32%), url('/images/matrix-background.png')",
+    backgroundSize: "cover, auto, auto, cover",
+    backgroundPosition: "center, center, center, center",
+    backgroundAttachment: "fixed",
+    position: "relative",
+    overflow: "hidden",
+    "&::before": {
+      content: '""',
+      position: "fixed",
+      inset: 0,
+      pointerEvents: "none",
+      backgroundImage:
+        "linear-gradient(rgba(115, 236, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(115, 236, 255, 0.035) 1px, transparent 1px)",
+      backgroundSize: "44px 44px",
+      maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.72), transparent 82%)"
+    },
+    "&::after": {
+      content: '""',
+      position: "fixed",
+      inset: 0,
+      pointerEvents: "none",
+      background:
+        "linear-gradient(180deg, transparent 0%, rgba(25, 211, 255, 0.035) 50%, transparent 100%)",
+      mixBlendMode: "screen"
+    }
+  },
+  appBar: {
+    bgcolor: "rgba(4, 9, 20, 0.46)",
+    color: "text.primary",
+    borderBottom: "1px solid rgba(185, 230, 255, 0.12)",
+    backdropFilter: "blur(16px) saturate(120%)",
+    WebkitBackdropFilter: "blur(16px) saturate(120%)",
+    boxShadow: "0 18px 60px rgba(0, 0, 0, 0.22)"
+  },
+  glassPanel: {
+    position: "relative",
+    overflow: "hidden",
+    border: "1px solid rgba(210, 236, 255, 0.14)",
+    backgroundColor: "rgba(3, 8, 18, 0.34)",
+    backgroundImage:
+      "linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012))",
+    backdropFilter: "blur(18px) saturate(120%)",
+    WebkitBackdropFilter: "blur(18px) saturate(120%)",
+    boxShadow:
+      "0 24px 72px rgba(0, 0, 0, 0.42), 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+    "&::before": {
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none",
+      background:
+        "linear-gradient(180deg, rgba(255,255,255,0.045), transparent 24%), linear-gradient(90deg, rgba(255,255,255,0.035), transparent 22%, transparent 78%, rgba(255,255,255,0.025))"
+    },
+    "& > *": {
+      position: "relative",
+      zIndex: 1
+    }
+  },
+  iconTile: {
+    width: 42,
+    height: 42,
+    display: "grid",
+    placeItems: "center",
+    borderRadius: 2,
+    color: "primary.main",
+    border: "1px solid rgba(210, 236, 255, 0.16)",
+    background: "rgba(255, 255, 255, 0.045)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)"
+  },
+  sectionLabel: {
+    color: "primary.light",
+    fontWeight: 900,
+    textShadow: "0 0 10px rgba(25, 211, 255, 0.22)"
+  },
+  divider: {
+    borderColor: "rgba(210, 236, 255, 0.1)"
+  },
+  composerBar: {
+    p: 2,
+    borderTop: "1px solid rgba(210, 236, 255, 0.1)",
+    background: "rgba(3, 8, 18, 0.22)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)"
+  }
+} satisfies Record<string, SxProps<Theme>>;
+
+function GlassPanel({ children, sx }: { children: ReactNode; sx?: SxProps<Theme> }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{ ...(ui.glassPanel as object), ...(sx as object) } as SxProps<Theme>}
+    >
+      {children}
+    </Paper>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <Typography variant="overline" sx={ui.sectionLabel}>
+      {children}
+    </Typography>
+  );
+}
+
+function IconTile({ children }: { children: ReactNode }) {
+  return <Box sx={ui.iconTile}>{children}</Box>;
+}
+
+function messageBubbleSx(author: ChatMessage["author"]): SxProps<Theme> {
+  const isMine = author === "me";
+  const isSystem = author === "system";
+
+  return {
+    px: 1.5,
+    py: 1,
+    backgroundImage: "none",
+    bgcolor: isMine
+      ? "rgba(25, 211, 255, 0.14)"
+      : isSystem
+        ? "rgba(181, 108, 255, 0.09)"
+        : "rgba(255, 255, 255, 0.065)",
+    color: "text.primary",
+    border: 1,
+    borderColor: isMine
+      ? "rgba(115, 236, 255, 0.28)"
+      : isSystem
+        ? "rgba(181, 108, 255, 0.22)"
+        : "rgba(255, 255, 255, 0.12)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 14px 34px rgba(0, 0, 0, 0.24)"
+  };
+}
 
 function bytesToBase64(bytes: ArrayBuffer | Uint8Array) {
   const values = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -276,75 +419,17 @@ export default function Home() {
     }
   }
 
-  const glassPanelSx = {
-    border: "1px solid rgba(115, 236, 255, 0.22)",
-    background:
-      "linear-gradient(145deg, rgba(10, 18, 33, 0.82), rgba(7, 10, 22, 0.58))",
-    backdropFilter: "blur(22px)",
-    boxShadow:
-      "0 22px 70px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 40px rgba(25, 211, 255, 0.08)"
-  };
-
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: "background.default",
-        backgroundImage:
-          "linear-gradient(135deg, rgba(5, 7, 15, 0.62) 0%, rgba(7, 17, 31, 0.38) 48%, rgba(5, 7, 15, 0.68) 100%), radial-gradient(circle at 18% 12%, rgba(25, 211, 255, 0.16), transparent 30%), radial-gradient(circle at 82% 18%, rgba(181, 108, 255, 0.13), transparent 32%), url('/images/matrix-background.png')",
-        backgroundSize: "cover, auto, auto, cover",
-        backgroundPosition: "center, center, center, center",
-        backgroundAttachment: "fixed",
-        position: "relative",
-        overflow: "hidden",
-        "&::before": {
-          content: '""',
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          backgroundImage:
-            "linear-gradient(rgba(115, 236, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(115, 236, 255, 0.035) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.72), transparent 82%)"
-        },
-        "&::after": {
-          content: '""',
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          background:
-            "linear-gradient(180deg, transparent 0%, rgba(25, 211, 255, 0.035) 50%, transparent 100%)",
-          mixBlendMode: "screen"
-        }
-      }}
-    >
+    <Box sx={ui.pageShell}>
       <AppBar
         position="static"
         elevation={0}
-        sx={{
-          bgcolor: "rgba(4, 9, 20, 0.62)",
-          color: "text.primary",
-          borderBottom: "1px solid rgba(115, 236, 255, 0.18)",
-          backdropFilter: "blur(18px)",
-          boxShadow: "0 0 40px rgba(25, 211, 255, 0.08)"
-        }}
+        sx={ui.appBar}
       >
         <Toolbar sx={{ gap: 2, minHeight: 72 }}>
-          <Box
-            sx={{
-              width: 42,
-              height: 42,
-              display: "grid",
-              placeItems: "center",
-              borderRadius: 2,
-              color: "primary.main",
-              border: "1px solid rgba(115, 236, 255, 0.34)",
-              background: "rgba(25, 211, 255, 0.08)",
-              boxShadow: "0 0 24px rgba(25, 211, 255, 0.22)"
-            }}
-          >
+          <IconTile>
             <LockIcon />
-          </Box>
+          </IconTile>
           <Typography
             variant="h5"
             component="h1"
@@ -382,16 +467,10 @@ export default function Home() {
             alignItems: "start"
           }}
         >
-          <Paper variant="outlined" sx={{ ...glassPanelSx, p: 2.5 }}>
+          <GlassPanel sx={{ p: 2.5 }}>
             <Stack spacing={2.5}>
               <Stack spacing={1}>
-                <Typography
-                  variant="overline"
-                  color="primary.light"
-                  sx={{ fontWeight: 900, textShadow: "0 0 12px rgba(25, 211, 255, 0.36)" }}
-                >
-                  Session
-                </Typography>
+                <SectionLabel>Session</SectionLabel>
                 <Typography variant="body2" color="text.secondary">
                   {status}
                 </Typography>
@@ -412,16 +491,10 @@ export default function Home() {
                 </Tooltip>
               </Stack>
 
-              <Divider sx={{ borderColor: "rgba(115, 236, 255, 0.14)" }} />
+              <Divider sx={ui.divider} />
 
               <Stack spacing={1}>
-                <Typography
-                  variant="overline"
-                  color="primary.light"
-                  sx={{ fontWeight: 900, textShadow: "0 0 12px rgba(25, 211, 255, 0.36)" }}
-                >
-                  Identity
-                </Typography>
+                <SectionLabel>Identity</SectionLabel>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <KeyIcon fontSize="small" color="primary" />
                   <Typography
@@ -453,12 +526,10 @@ export default function Home() {
                 messages through the relay.
               </Alert>
             </Stack>
-          </Paper>
+          </GlassPanel>
 
-          <Paper
-            variant="outlined"
+          <GlassPanel
             sx={{
-              ...glassPanelSx,
               minHeight: { xs: "65vh", md: "72vh" },
               display: "grid",
               gridTemplateRows: "1fr auto"
@@ -493,35 +564,7 @@ export default function Home() {
                       maxWidth: "min(72ch, 85%)"
                     }}
                   >
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        px: 1.5,
-                        py: 1,
-                        backgroundImage: "none",
-                        bgcolor:
-                          message.author === "me"
-                            ? "rgba(25, 211, 255, 0.16)"
-                            : message.author === "system"
-                              ? "rgba(181, 108, 255, 0.1)"
-                              : "rgba(255, 255, 255, 0.07)",
-                        color: "text.primary",
-                        border: 1,
-                        borderColor:
-                          message.author === "me"
-                            ? "rgba(115, 236, 255, 0.46)"
-                            : message.author === "system"
-                              ? "rgba(181, 108, 255, 0.38)"
-                              : "rgba(255, 255, 255, 0.14)",
-                        backdropFilter: "blur(12px)",
-                        boxShadow:
-                          message.author === "me"
-                            ? "0 0 26px rgba(25, 211, 255, 0.18)"
-                            : message.author === "system"
-                              ? "0 0 20px rgba(181, 108, 255, 0.12)"
-                              : "0 0 18px rgba(255, 255, 255, 0.06)"
-                      }}
-                    >
+                    <Paper elevation={0} sx={messageBubbleSx(message.author)}>
                       <Typography variant="body1">{message.text}</Typography>
                       <Typography
                         variant="caption"
@@ -536,15 +579,7 @@ export default function Home() {
               <div ref={messagesEndRef} />
             </Stack>
 
-            <Box
-              component="form"
-              onSubmit={sendMessage}
-              sx={{
-                p: 2,
-                borderTop: "1px solid rgba(115, 236, 255, 0.16)",
-                background: "rgba(3, 8, 18, 0.34)"
-              }}
-            >
+            <Box component="form" onSubmit={sendMessage} sx={ui.composerBar}>
               <Stack direction="row" spacing={1}>
                 <TextField
                   placeholder={peerReady ? "Write an encrypted message" : "Waiting for a peer"}
@@ -564,7 +599,7 @@ export default function Home() {
                 </Button>
               </Stack>
             </Box>
-          </Paper>
+          </GlassPanel>
         </Box>
       </Container>
     </Box>
