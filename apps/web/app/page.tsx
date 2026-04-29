@@ -2,7 +2,6 @@
 
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
-import LockIcon from "@mui/icons-material/Lock";
 import PauseIcon from "@mui/icons-material/Pause";
 import RadioIcon from "@mui/icons-material/Radio";
 import SendIcon from "@mui/icons-material/Send";
@@ -105,16 +104,24 @@ const ui = {
     }
   },
   iconTile: {
-    width: 42,
-    height: 42,
+    width: 46,
+    height: 46,
     display: "grid",
     placeItems: "center",
-    borderRadius: 2,
+    borderRadius: 2.25,
     color: "primary.main",
-    border: "1px solid rgba(210, 236, 255, 0.16)",
-    background: "rgba(255, 255, 255, 0.045)",
+    border: "1px solid rgba(210, 236, 255, 0.14)",
+    background: "rgba(255, 255, 255, 0.035)",
     backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)"
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.28)",
+    "& img": {
+      width: 38,
+      height: 38,
+      borderRadius: 1.75,
+      display: "block",
+      objectFit: "cover"
+    }
   },
   sectionLabel: {
     color: "primary.light",
@@ -154,6 +161,17 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 function IconTile({ children }: { children: ReactNode }) {
   return <Box sx={ui.iconTile}>{children}</Box>;
+}
+
+function BrandIcon() {
+  return (
+    <Box
+      component="img"
+      src="/images/agent-brand-icon.png"
+      alt="E2E Chat brand icon"
+      loading="eager"
+    />
+  );
 }
 
 function messageBubbleSx(author: ChatMessage["author"]): SxProps<Theme> {
@@ -477,7 +495,7 @@ export default function Home() {
       >
         <Toolbar sx={{ gap: 2, minHeight: 72 }}>
           <IconTile>
-            <LockIcon />
+            <BrandIcon />
           </IconTile>
           <Typography
             variant="h5"
@@ -489,7 +507,7 @@ export default function Home() {
               textShadow: "0 0 18px rgba(25, 211, 255, 0.34)"
             }}
           >
-            E2E Chat
+            Mr. Anderson Chat
           </Typography>
           <Chip
             color={peerReady ? "success" : "warning"}
