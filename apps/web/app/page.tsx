@@ -130,7 +130,13 @@ export default function Home() {
   const shortClientId = useMemo(() => clientId.slice(0, 8) || "pending", [clientId]);
 
   useEffect(() => {
-    queueMicrotask(() => setClientId(crypto.randomUUID()));
+    queueMicrotask(() => {
+      const nextClientId = crypto.randomUUID();
+      const nextRoomId = `demo-${nextClientId.slice(0, 6)}`;
+      setClientId(nextClientId);
+      setRoomId(nextRoomId);
+      setDraftRoomId(nextRoomId);
+    });
   }, []);
 
   useEffect(() => {
@@ -270,23 +276,104 @@ export default function Home() {
     }
   }
 
+  const glassPanelSx = {
+    border: "1px solid rgba(115, 236, 255, 0.22)",
+    background:
+      "linear-gradient(145deg, rgba(10, 18, 33, 0.82), rgba(7, 10, 22, 0.58))",
+    backdropFilter: "blur(22px)",
+    boxShadow:
+      "0 22px 70px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 40px rgba(25, 211, 255, 0.08)"
+  };
+
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      <AppBar position="static" color="inherit" elevation={0}>
-        <Toolbar sx={{ borderBottom: 1, borderColor: "divider", gap: 2 }}>
-          <LockIcon color="primary" />
-          <Typography variant="h6" component="h1" sx={{ flexGrow: 1, fontWeight: 700 }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        backgroundImage:
+          "linear-gradient(135deg, rgba(5, 7, 15, 0.62) 0%, rgba(7, 17, 31, 0.38) 48%, rgba(5, 7, 15, 0.68) 100%), radial-gradient(circle at 18% 12%, rgba(25, 211, 255, 0.16), transparent 30%), radial-gradient(circle at 82% 18%, rgba(181, 108, 255, 0.13), transparent 32%), url('/images/matrix-background.png')",
+        backgroundSize: "cover, auto, auto, cover",
+        backgroundPosition: "center, center, center, center",
+        backgroundAttachment: "fixed",
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          backgroundImage:
+            "linear-gradient(rgba(115, 236, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(115, 236, 255, 0.035) 1px, transparent 1px)",
+          backgroundSize: "44px 44px",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.72), transparent 82%)"
+        },
+        "&::after": {
+          content: '""',
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          background:
+            "linear-gradient(180deg, transparent 0%, rgba(25, 211, 255, 0.035) 50%, transparent 100%)",
+          mixBlendMode: "screen"
+        }
+      }}
+    >
+      <AppBar
+        position="static"
+        elevation={0}
+        sx={{
+          bgcolor: "rgba(4, 9, 20, 0.62)",
+          color: "text.primary",
+          borderBottom: "1px solid rgba(115, 236, 255, 0.18)",
+          backdropFilter: "blur(18px)",
+          boxShadow: "0 0 40px rgba(25, 211, 255, 0.08)"
+        }}
+      >
+        <Toolbar sx={{ gap: 2, minHeight: 72 }}>
+          <Box
+            sx={{
+              width: 42,
+              height: 42,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: 2,
+              color: "primary.main",
+              border: "1px solid rgba(115, 236, 255, 0.34)",
+              background: "rgba(25, 211, 255, 0.08)",
+              boxShadow: "0 0 24px rgba(25, 211, 255, 0.22)"
+            }}
+          >
+            <LockIcon />
+          </Box>
+          <Typography
+            variant="h5"
+            component="h1"
+            sx={{
+              flexGrow: 1,
+              fontWeight: 900,
+              letterSpacing: 0,
+              textShadow: "0 0 18px rgba(25, 211, 255, 0.34)"
+            }}
+          >
             E2E Chat
           </Typography>
           <Chip
             color={peerReady ? "success" : "warning"}
             label={peerReady ? "Encrypted" : "Waiting for peer"}
             variant="outlined"
+            sx={{
+              fontWeight: 800,
+              bgcolor: peerReady ? "rgba(77, 255, 181, 0.08)" : "rgba(255, 209, 102, 0.08)",
+              borderColor: peerReady ? "rgba(77, 255, 181, 0.58)" : "rgba(255, 209, 102, 0.58)",
+              boxShadow: peerReady
+                ? "0 0 22px rgba(77, 255, 181, 0.22)"
+                : "0 0 22px rgba(255, 209, 102, 0.18)"
+            }}
           />
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 }, position: "relative", zIndex: 1 }}>
         <Box
           sx={{
             display: "grid",
@@ -295,13 +382,19 @@ export default function Home() {
             alignItems: "start"
           }}
         >
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <Paper variant="outlined" sx={{ ...glassPanelSx, p: 2.5 }}>
             <Stack spacing={2.5}>
               <Stack spacing={1}>
-                <Typography variant="overline" color="text.secondary">
+                <Typography
+                  variant="overline"
+                  color="primary.light"
+                  sx={{ fontWeight: 900, textShadow: "0 0 12px rgba(25, 211, 255, 0.36)" }}
+                >
                   Session
                 </Typography>
-                <Typography variant="body2">{status}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {status}
+                </Typography>
               </Stack>
 
               <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -319,15 +412,26 @@ export default function Home() {
                 </Tooltip>
               </Stack>
 
-              <Divider />
+              <Divider sx={{ borderColor: "rgba(115, 236, 255, 0.14)" }} />
 
               <Stack spacing={1}>
-                <Typography variant="overline" color="text.secondary">
+                <Typography
+                  variant="overline"
+                  color="primary.light"
+                  sx={{ fontWeight: 900, textShadow: "0 0 12px rgba(25, 211, 255, 0.36)" }}
+                >
                   Identity
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   <KeyIcon fontSize="small" color="primary" />
-                  <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontFamily: "monospace",
+                      color: "primary.light",
+                      textShadow: "0 0 12px rgba(25, 211, 255, 0.26)"
+                    }}
+                  >
                     {shortClientId}
                   </Typography>
                   <Tooltip title="Copy client id">
@@ -354,6 +458,7 @@ export default function Home() {
           <Paper
             variant="outlined"
             sx={{
+              ...glassPanelSx,
               minHeight: { xs: "65vh", md: "72vh" },
               display: "grid",
               gridTemplateRows: "1fr auto"
@@ -370,7 +475,9 @@ export default function Home() {
                     textAlign: "center"
                   }}
                 >
-                  <Typography>Messages will appear here after a peer joins.</Typography>
+                  <Typography sx={{ textShadow: "0 0 18px rgba(25, 211, 255, 0.16)" }}>
+                    Messages will appear here after a peer joins.
+                  </Typography>
                 </Box>
               ) : (
                 messages.map((message) => (
@@ -391,15 +498,28 @@ export default function Home() {
                       sx={{
                         px: 1.5,
                         py: 1,
+                        backgroundImage: "none",
                         bgcolor:
                           message.author === "me"
-                            ? "primary.main"
+                            ? "rgba(25, 211, 255, 0.16)"
                             : message.author === "system"
-                              ? "grey.100"
-                              : "common.white",
-                        color: message.author === "me" ? "primary.contrastText" : "text.primary",
+                              ? "rgba(181, 108, 255, 0.1)"
+                              : "rgba(255, 255, 255, 0.07)",
+                        color: "text.primary",
                         border: 1,
-                        borderColor: message.author === "me" ? "primary.main" : "divider"
+                        borderColor:
+                          message.author === "me"
+                            ? "rgba(115, 236, 255, 0.46)"
+                            : message.author === "system"
+                              ? "rgba(181, 108, 255, 0.38)"
+                              : "rgba(255, 255, 255, 0.14)",
+                        backdropFilter: "blur(12px)",
+                        boxShadow:
+                          message.author === "me"
+                            ? "0 0 26px rgba(25, 211, 255, 0.18)"
+                            : message.author === "system"
+                              ? "0 0 20px rgba(181, 108, 255, 0.12)"
+                              : "0 0 18px rgba(255, 255, 255, 0.06)"
                       }}
                     >
                       <Typography variant="body1">{message.text}</Typography>
@@ -416,7 +536,15 @@ export default function Home() {
               <div ref={messagesEndRef} />
             </Stack>
 
-            <Box component="form" onSubmit={sendMessage} sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
+            <Box
+              component="form"
+              onSubmit={sendMessage}
+              sx={{
+                p: 2,
+                borderTop: "1px solid rgba(115, 236, 255, 0.16)",
+                background: "rgba(3, 8, 18, 0.34)"
+              }}
+            >
               <Stack direction="row" spacing={1}>
                 <TextField
                   placeholder={peerReady ? "Write an encrypted message" : "Waiting for a peer"}

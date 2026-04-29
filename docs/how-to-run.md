@@ -132,7 +132,7 @@ Open a second browser window or tab at the same URL:
 http://localhost:3000
 ```
 
-Keep both clients in the same room, such as the default `demo-room`.
+Keep both clients in the same room. The first window generates a room name like `demo-1a2b3c`; use that same room name in the second window and click the join button.
 
 Once the two clients see each other:
 
